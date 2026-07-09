@@ -1,14 +1,18 @@
 import logging
+from collections import Counter
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
-from app.models import Route, Flight, CargoRequest
+from app.models import Route, Flight, CargoRequest, AircraftType, OptimizationResult
 from app.schemas.schemas import (
     RouteOut,
     FlightOut,
     CargoRequestOut,
+    AircraftTypeOut,
+    OptimizationResultOut,
+    KpiSummaryOut,
     OptimizeResponse,
     TrainResponse,
     PredictResponse,
@@ -36,6 +40,42 @@ def get_flights(db: Session = Depends(get_db)):
 @router.get("/cargo-requests", response_model=list[CargoRequestOut])
 def get_cargo_requests(db: Session = Depends(get_db)):
     return db.query(CargoRequest).all()
+
+
+@router.get("/aircraft-types", response_model=list[AircraftTypeOut])
+def get_aircraft_types(db: Session = Depends(get_db)):
+    return db.query(AircraftType).all()
+
+
+@router.get("/results/{scenario_name}", response_model=list[OptimizationResultOut])
+def get_results(scenario_name: str, db: Session = Depends(get_db)):
+    return (
+        db.query(OptimizationResult)
+        .filter(OptimizationResult.scenario_name == scenario_name)
+        .order_by(OptimizationResult.run_at.desc())
+        .all()
+    )
+
+
+@router.get("/kpis/{scenario_name}", response_model=KpiSummaryOut)
+def get_kpis(scenario_name: str, db: Session = Depends(get_db)):
+    rows = db.query(OptimizationResult).filter(OptimizationResult.scenario_name == scenario_name).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail="Bu senaryo için sonuç bulunamadı.")
+
+    accepted = [r for r in rows if r.decision == "accepted"]
+    rejected = [r for r in rows if r.decision == "rejected"]
+    reason_breakdown = Counter(r.reason for r in rejected if r.reason)
+
+    return {
+        "scenario_name": scenario_name,
+        "total_requests": len(rows),
+        "accepted_count": len(accepted),
+        "rejected_count": len(rejected),
+        "total_revenue": sum(r.revenue for r in accepted),
+        "rejection_reason_breakdown": dict(reason_breakdown),
+        "last_run_at": max(r.run_at for r in rows),
+    }
 
 
 @router.post("/optimize", response_model=OptimizeResponse)

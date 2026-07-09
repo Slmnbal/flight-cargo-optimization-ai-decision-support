@@ -9,6 +9,10 @@ class RouteOut(BaseModel):
     distance_km: float
     route_type: str
     region: str
+    customs_required: bool
+    restricted_cargo_allowed: bool
+    embargo_active: bool
+    embargoed_cargo_types: str | None
     is_active: bool
 
     class Config:
@@ -20,6 +24,7 @@ class FlightOut(BaseModel):
     flight_number: str
     route_id: int
     aircraft_type: str
+    aircraft_registration: str | None
     departure_scheduled: datetime
     arrival_scheduled: datetime
     status: str
@@ -34,12 +39,49 @@ class CargoRequestOut(BaseModel):
     cargo_type: str
     weight_kg: float
     volume_m3: float
+    requires_temperature_control: bool
     priority_class: str
     revenue: float
+    booking_cutoff_hours: int
     status: str
 
     class Config:
         from_attributes = True
+
+
+class AircraftTypeOut(BaseModel):
+    aircraft_type: str
+    max_cargo_weight_kg: float
+    max_cargo_volume_m3: float
+    temperature_controlled_capacity_kg: float
+    is_freighter: bool
+    dangerous_goods_allowed: bool
+
+    class Config:
+        from_attributes = True
+
+
+class OptimizationResultOut(BaseModel):
+    result_id: int
+    scenario_name: str
+    request_id: int
+    decision: str
+    revenue: float
+    reason: str | None
+    run_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class KpiSummaryOut(BaseModel):
+    scenario_name: str
+    total_requests: int
+    accepted_count: int
+    rejected_count: int
+    total_revenue: float
+    rejection_reason_breakdown: dict[str, int]
+    last_run_at: datetime
 
 
 class OptimizeResponse(BaseModel):
