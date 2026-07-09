@@ -2,11 +2,17 @@
 Basit karar destek arayüzü. Backend'in (uvicorn app.main:app) çalıştığını varsayar.
 Çalıştırmak için: streamlit run streamlit_app.py
 """
+import os
+
 import pandas as pd
 import requests
 import streamlit as st
 
-API_URL = "http://localhost:8000"
+# Yerelde çalıştırınca (streamlit run) varsayılan localhost'u kullanır.
+# Docker Compose içinde çalışınca, backend'e "localhost" ile değil servis adıyla
+# ("backend") erişilir - bunu docker-compose.yml içindeki API_URL ortam değişkeni
+# ile override edeceğiz. Kod tek satır değişmeden iki ortamda da çalışır.
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 st.set_page_config(page_title="Flight Cargo Optimization", layout="wide")
 st.title("Flight Cargo Optimization & AI Decision Support System")
