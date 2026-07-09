@@ -11,4 +11,8 @@ class OptimizationResult(Base):
     request_id = Column(Integer, ForeignKey("cargo_requests.request_id"), nullable=False)
     decision = Column(String, nullable=False)  # accepted / rejected
     revenue = Column(Float, nullable=False)
+    # decision="rejected" olduğunda neden reddedildiğini açıklar, örn.:
+    # "capacity_exceeded" / "embargo" / "dangerous_goods_restricted" / "priority_capacity_reserved"
+    # decision="accepted" için None kalır.
+    reason = Column(String, nullable=True)
     run_at = Column(DateTime, default=datetime.utcnow)

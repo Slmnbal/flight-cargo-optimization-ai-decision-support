@@ -14,4 +14,7 @@ class Route(Base):
     customs_required = Column(Boolean, default=False)
     restricted_cargo_allowed = Column(Boolean, default=True)
     embargo_active = Column(Boolean, default=False)
+    # embargo_active=True iken kapsamı daraltır: virgülle ayrılmış cargo_type listesi
+    # (örn. "live_animal,dangerous_goods"). None/boş ise embargo TÜM kargo tiplerini kapsar.
+    embargoed_cargo_types = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
