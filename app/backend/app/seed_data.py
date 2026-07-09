@@ -6,11 +6,10 @@ import random
 from datetime import datetime, timedelta
 
 from app.database.connection import Base, engine, SessionLocal
-from app.models.airport import Airport
-from app.models.aircraft_type import AircraftType
-from app.models.route import Route
-from app.models.flight import Flight
-from app.models.cargo_request import CargoRequest
+# app.models paketinden import ediyoruz (tek tek dosyalardan değil) ki
+# __init__.py üzerinden tüm modeller (optimization_result dahil) Base.metadata'ya
+# kaydolsun ve create_all() hiçbir tabloyu atlamasın.
+from app.models import Airport, AircraftType, Route, Flight, CargoRequest
 
 random.seed(42)
 
