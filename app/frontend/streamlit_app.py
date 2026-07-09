@@ -75,14 +75,39 @@ if requests_resp.ok:
                     st.error(f"Hata: {pred_resp.text}")
     st.divider()
     st.subheader("AI Agent'a Soru Sor")
-    st.caption("Örnek: 'default senaryosunda kabul edilen talepler neler?' ya da '1 numaralı talep neden reddedildi?'")
+    st.caption(
+        "Örnek: 'default senaryosunda kabul edilen talepler neler?' (canlı veri) ya da "
+        "'priority_class nasıl işliyor?' (dokümantasyon/RAG). Sohbet aynı oturum boyunca "
+        "hafızasını korur -- 'az önce bahsettiğin talep' gibi takip soruları sorabilirsin."
+    )
 
-    question = st.text_input("Sorunu yaz")
-    if st.button("Sor"):
-        ask_resp = requests.post(f"{API_URL}/agent/ask", json={"question": question})
+    if "agent_session_id" not in st.session_state:
+        st.session_state["agent_session_id"] = None
+    if "agent_chat_history" not in st.session_state:
+        st.session_state["agent_chat_history"] = []
+
+    for turn in st.session_state["agent_chat_history"]:
+        st.chat_message(turn["role"]).write(turn["content"])
+
+    question = st.chat_input("Sorunu yaz")
+    if question:
+        st.chat_message("user").write(question)
+        ask_resp = requests.post(
+            f"{API_URL}/agent/ask",
+            json={"question": question, "session_id": st.session_state["agent_session_id"]},
+        )
         if ask_resp.ok:
-            st.info(ask_resp.json()["answer"])
+            data = ask_resp.json()
+            st.session_state["agent_session_id"] = data["session_id"]
+            st.session_state["agent_chat_history"].append({"role": "user", "content": question})
+            st.session_state["agent_chat_history"].append({"role": "assistant", "content": data["answer"]})
+            st.chat_message("assistant").write(data["answer"])
         else:
             st.error(f"Hata: {ask_resp.text}")
+
+    if st.session_state["agent_chat_history"] and st.button("Sohbeti sıfırla"):
+        st.session_state["agent_session_id"] = None
+        st.session_state["agent_chat_history"] = []
+        st.rerun()
 else:
     st.warning("Backend'e ulaşılamadı. `uvicorn app.main:app --reload` ile çalıştığından emin ol.")

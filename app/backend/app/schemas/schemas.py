@@ -63,7 +63,12 @@ class PredictResponse(BaseModel):
 
 class AgentAskRequest(BaseModel):
     question: str
+    # İlk soruda boş bırakılır (yeni konuşma), agent bir session_id üretir ve
+    # cevapla birlikte döner. Sonraki sorularda aynı session_id gönderilirse,
+    # agent önceki turları hafızasında tutar.
+    session_id: str | None = None
 
 
 class AgentAskResponse(BaseModel):
     answer: str
+    session_id: str

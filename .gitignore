@@ -24,6 +24,9 @@ mlruns/
 model_store/
 *.joblib
 
+# RAG vector store (python -m app.rag.ingest_docs ile yeniden üretilebilir)
+app/backend/app/rag/store/
+
 # IDE
 .vscode/
 .idea/

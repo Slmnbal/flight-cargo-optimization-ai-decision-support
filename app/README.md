@@ -60,7 +60,14 @@ Tam interaktif dokümantasyon: sunucu çalışırken `http://localhost:8000/docs
 
 ## AI Agent
 
-Google Gemini API ile **tool calling** kullanılıyor. Agent, kullanıcı sorusuna göre hangi fonksiyonu (`get_accepted_requests`, `get_rejected_requests`, `calculate_capacity_utilization`, `explain_request_decision`) çağıracağına kendisi karar veriyor. Guardrail: agent sadece bu fonksiyonların döndürdüğü gerçek veriye dayanır, veri uydurmaz, solver kararını değiştirmez (bkz. `app/backend/app/agents/explainer.py`).
+Google Gemini API ile **tool calling** kullanılıyor. Agent, kullanıcı sorusuna göre hangi fonksiyonu çağıracağına kendisi karar veriyor:
+
+- `get_accepted_requests`, `get_rejected_requests`, `calculate_capacity_utilization`, `explain_request_decision`: **canlı veritabanı** sorguları (sayısal/güncel veri).
+- `search_knowledge_base`: `docs/business_rules.md` ve ADR'ler üzerinde **RAG** (retrieval-augmented generation) — "priority_class nasıl işliyor", "neden embargo var" gibi kavramsal sorular için. Embedding Gemini'nin `embed_content` API'siyle üretiliyor, Chroma'da (`app/backend/app/rag/store/`, gitignored) saklanıyor. Kurmak/güncellemek için: `python -m app.rag.ingest_docs`.
+
+Guardrail: agent sadece bu tool'ların döndürdüğü gerçek veriye/dokümana dayanır, veri uydurmaz, solver kararını değiştirmez, canlı veri ile dokümantasyon kaynaklı bilgiyi karıştırmaz (bkz. `app/backend/app/agents/explainer.py`).
+
+**Hafıza:** `/agent/ask` bir `session_id` alır/döner. Aynı `session_id` ile art arda soru sorulduğunda, agent önceki turları hatırlar (son 20 mesaj, bkz. `app/backend/app/services/agent_service.py`) — `session_id` verilmezse her soru sıfırdan, hafızasız bir konuşma başlatır.
 
 ## Nasıl Çalıştırılır
 

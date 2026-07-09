@@ -10,6 +10,7 @@ from app.models.route import Route
 from app.models.flight import Flight
 from app.models.cargo_request import CargoRequest
 from app.models.optimization_result import OptimizationResult
+from app.models.agent_message import AgentMessage
 
 __all__ = [
     "Airport",
@@ -18,4 +19,5 @@ __all__ = [
     "Flight",
     "CargoRequest",
     "OptimizationResult",
+    "AgentMessage",
 ]

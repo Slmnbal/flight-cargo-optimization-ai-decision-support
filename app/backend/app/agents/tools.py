@@ -12,6 +12,7 @@ parametreleri beklediğini (type hint) otomatik olarak buradan çıkarıyor.
 """
 from app.database.connection import SessionLocal
 from app.models import CargoRequest, OptimizationResult, Flight, AircraftType
+from app.rag.knowledge_base import search_knowledge_base as _search_knowledge_base
 
 
 def get_accepted_requests(scenario_name: str) -> list[dict]:
@@ -118,3 +119,15 @@ def explain_request_decision(request_id: int) -> dict:
         }
     finally:
         db.close()
+
+
+def search_knowledge_base(query: str) -> list[str]:
+    """Projenin kendi tasarım dokümantasyonundan (iş kuralları, kısıt gerekçeleri,
+    ADR'ler) kullanıcının sorusuyla en alakalı metin parçalarını getirir. Canlı
+    veritabanı verisi DEĞİLDİR -- 'neden embargo var', 'priority_class nasıl
+    işliyor', 'reserved capacity ne demek' gibi kavramsal/tasarım sorularında kullan.
+
+    Args:
+        query: Kullanıcının kavramsal/tasarım sorusu.
+    """
+    return _search_knowledge_base(query)

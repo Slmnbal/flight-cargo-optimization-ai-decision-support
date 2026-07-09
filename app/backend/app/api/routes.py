@@ -75,10 +75,10 @@ def predict_ml(request_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/agent/ask", response_model=AgentAskResponse)
-def agent_ask(payload: AgentAskRequest):
+def agent_ask(payload: AgentAskRequest, db: Session = Depends(get_db)):
     try:
-        answer = ask_agent(payload.question)
-        return {"answer": answer}
+        answer, session_id = ask_agent(db, payload.question, payload.session_id)
+        return {"answer": answer, "session_id": session_id}
     except Exception as exc:
         logger.exception("Agent failed")
         raise HTTPException(status_code=500, detail=str(exc))
