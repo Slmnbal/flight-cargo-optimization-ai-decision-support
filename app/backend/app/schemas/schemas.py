@@ -47,3 +47,15 @@ class OptimizeResponse(BaseModel):
     accepted: list[int]
     rejected: list[int]
     total_revenue: float
+
+
+class TrainResponse(BaseModel):
+    trained: bool
+    detail: str
+    accuracy: float | None = None
+    n_samples: int | None = None
+
+
+class PredictResponse(BaseModel):
+    request_id: int
+    acceptance_probability: float

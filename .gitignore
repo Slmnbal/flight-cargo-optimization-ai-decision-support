@@ -21,6 +21,8 @@ env/
 
 # ML / experiment tracking
 mlruns/
+model_store/
+*.joblib
 
 # IDE
 .vscode/
