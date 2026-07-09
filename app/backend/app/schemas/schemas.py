@@ -59,3 +59,11 @@ class TrainResponse(BaseModel):
 class PredictResponse(BaseModel):
     request_id: int
     acceptance_probability: float
+
+
+class AgentAskRequest(BaseModel):
+    question: str
+
+
+class AgentAskResponse(BaseModel):
+    answer: str

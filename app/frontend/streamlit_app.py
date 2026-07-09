@@ -67,5 +67,16 @@ if requests_resp.ok:
                     st.info(f"Talep #{selected_id} için tahmini kabul olasılığı: %{prob * 100:.1f}")
                 else:
                     st.error(f"Hata: {pred_resp.text}")
+    st.divider()
+    st.subheader("AI Agent'a Soru Sor")
+    st.caption("Örnek: 'default senaryosunda kabul edilen talepler neler?' ya da '1 numaralı talep neden reddedildi?'")
+
+    question = st.text_input("Sorunu yaz")
+    if st.button("Sor"):
+        ask_resp = requests.post(f"{API_URL}/agent/ask", json={"question": question})
+        if ask_resp.ok:
+            st.info(ask_resp.json()["answer"])
+        else:
+            st.error(f"Hata: {ask_resp.text}")
 else:
     st.warning("Backend'e ulaşılamadı. `uvicorn app.main:app --reload` ile çalıştığından emin ol.")

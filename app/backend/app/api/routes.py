@@ -12,9 +12,12 @@ from app.schemas.schemas import (
     OptimizeResponse,
     TrainResponse,
     PredictResponse,
+    AgentAskRequest,
+    AgentAskResponse,
 )
 from app.optimization.optimizer import run_optimization
 from app.ml.demand_forecast import train_acceptance_model, load_model, predict_acceptance_probability
+from app.agents.explainer import ask_agent
 
 logger = logging.getLogger("cargo_api")
 router = APIRouter()
@@ -69,3 +72,13 @@ def predict_ml(request_id: int, db: Session = Depends(get_db)):
         model, request.weight_kg, request.volume_m3, request.revenue
     )
     return {"request_id": request_id, "acceptance_probability": probability}
+
+
+@router.post("/agent/ask", response_model=AgentAskResponse)
+def agent_ask(payload: AgentAskRequest):
+    try:
+        answer = ask_agent(payload.question)
+        return {"answer": answer}
+    except Exception as exc:
+        logger.exception("Agent failed")
+        raise HTTPException(status_code=500, detail=str(exc))
