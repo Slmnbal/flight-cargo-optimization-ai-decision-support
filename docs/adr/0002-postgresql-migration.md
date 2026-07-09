@@ -37,13 +37,22 @@ sürüklenmesine (drift) yol açar. Bunun bedeli: kurulum artık bir adım daha 
 (`alembic upgrade head` seed'den önce çalıştırılmalı) — ama bu, gerçek production
 deploy'ların çalışma şekli, ve README'de açıkça belgelendi.
 
-## Bilinen sınırlama
+## Doğrulama
 
-Bu ortamda Docker daemon çalışır durumda değildi, bu yüzden `docker compose up --build`
-ile gerçek bir Postgres konteynerine karşı uçtan uca doğrulama yapılamadı. Doğrulanan
-kısımlar: `docker compose config` ile compose dosyasının söz dizimi/servis bağımlılık
-grafiği geçerli; SQLite yolu (Alembic migration + seed + tüm pytest testleri + canlı
-`/optimize` çağrısı) uçtan uca çalıştı; `psycopg2-binary` sürücüsü kuruldu ve import
-edilebiliyor. Postgres'e karşı gerçek bir `alembic upgrade head` + `seed_data.py`
-çalıştırması, Docker Desktop (veya yerel bir Postgres) mevcut olduğunda yapılmalı —
-bu, Package C'nin resmi olarak "tamamlandı" sayılmadan önceki son doğrulama adımı.
+İlk yazımda Docker daemon bu ortamda çalışmıyordu, bu yüzden Postgres yolu sadece
+`docker compose config` (syntax/bağımlılık grafiği) ve SQLite yolu (Alembic + seed +
+tüm pytest testleri + canlı `/optimize`) ile doğrulanmıştı. Docker Desktop açıldıktan
+sonra `docker compose up --build` ile gerçek uçtan uca doğrulama yapıldı:
+- Backend logu `Context impl PostgresqlImpl` gösterdi — Alembic gerçekten Postgres'e
+  karşı çalıştı, her iki migration da (initial schema + agent_messages) sırayla
+  uygulandı.
+- `db` servisi `service_healthy` olana kadar backend gerçekten bekledi (compose
+  log'unda `Container app-db-1 Healthy` → `Container app-backend-1 Starting` sırası).
+- `psql -U cargo -d cargo -c '\dt'` 8 tabloyu (6 domain tablosu + `agent_messages` +
+  Alembic'in kendi `alembic_version` tablosu) doğru şekilde gösterdi.
+- `python -m app.seed_data` konteyner içinden Postgres'e 427 kargo talebi yazdı.
+- `POST /optimize` Postgres'e karşı `"status": "Optimal"` döndürdü, frontend (8501)
+  200 yanıt verdi.
+
+Dual-support kararı (SQLite yerel geliştirme, Postgres Docker/production) hem kod
+seviyesinde hem de gerçek bir konteyner ortamında doğrulanmış durumda.
