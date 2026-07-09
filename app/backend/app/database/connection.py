@@ -1,9 +1,17 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "sqlite:///./cargo.db"
+from app.config import settings
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = settings.database_url
+
+# check_same_thread SQLite'a özgü bir bayrak: SQLite varsayılan olarak bir bağlantının
+# sadece açıldığı thread'den kullanılmasına izin verir, FastAPI ise her isteği farklı
+# bir thread'de işleyebilir -- bu yüzden SQLite'ta bunu kapatmamız gerekiyor. Postgres/
+# psycopg2 böyle bir kısıtlamaya sahip değil, dolayısıyla bu argümanı ona hiç göndermiyoruz.
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

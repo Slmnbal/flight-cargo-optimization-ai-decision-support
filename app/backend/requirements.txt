@@ -2,6 +2,9 @@ fastapi==0.115.0
 uvicorn==0.30.6
 sqlalchemy==2.0.35
 pydantic==2.9.2
+pydantic-settings==2.14.2
+psycopg2-binary==2.9.12
+alembic==1.18.5
 pulp==2.8.0
 pandas==2.2.3
 scikit-learn==1.5.2

@@ -2,15 +2,16 @@ import logging
 
 from fastapi import FastAPI
 
-from app.database.connection import Base, engine
 from app.api.routes import router
 
 logging.basicConfig(level=logging.INFO)
 
-# Base.metadata artık app.models üzerinden (routes.py -> app.models import zinciri ile)
-# tüm modelleri tanıyor, bu yüzden burada tüm tablolar güvenle oluşturulur.
-Base.metadata.create_all(bind=engine)
-
+# Şema artık Alembic tarafından yönetiliyor (bkz. app/backend/alembic/). Burada
+# Base.metadata.create_all() ÇAĞRILMIYOR: SQLAlchemy'nin örtük tablo oluşturması ile
+# Alembic'in migration geçmişi çakışırsa (Alembic'in haberi olmayan bir tablo var
+# olursa), "alembic_version" satırı hiç oluşmaz ve ileride "table already exists"
+# hatası ya da sessiz şema sürüklenmesi (drift) yaşanır. Kurulumda artık açık bir adım
+# gerekiyor: `alembic upgrade head` (bkz. README).
 app = FastAPI(
     title="Flight Cargo Optimization & AI Decision Support System",
     description="Kargo talebi kabul/red kararlarını optimize eden karar destek sistemi.",

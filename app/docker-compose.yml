@@ -1,14 +1,36 @@
-version: "3.9"
-
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cargo
+      POSTGRES_USER: cargo
+      POSTGRES_PASSWORD: cargo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cargo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./backend
     ports:
       - "8000:8000"
     env_file:
       - ./backend/.env
+    environment:
+      # Postgres, yerel sqlite:///./cargo.db varsayılanının yerine geçiyor.
+      # backend, db servisi "healthy" olana kadar (yani gerçekten bağlantı
+      # kabul edene kadar, sadece süreç başlayana kadar değil) beklediği için
+      # "backend Postgres hazır olmadan ayağa kalkıp bağlantı hatası verir mi"
+      # sorusuyla uğraşmıyoruz.
+      - DATABASE_URL=postgresql://cargo:cargo@db:5432/cargo
     volumes:
       - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
 
   frontend:
     build: ./frontend
@@ -18,3 +40,6 @@ services:
       - API_URL=http://backend:8000
     depends_on:
       - backend
+
+volumes:
+  pgdata:

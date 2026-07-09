@@ -10,18 +10,13 @@ Guardrail kuralları (SYSTEM_INSTRUCTION içinde LLM'e açıkça söyleniyor):
 GEMINI_API_KEY tanımlı değilse, agent uçtan uca çalışmaya devam etsin diye
 basit bir kural tabanlı moda düşer.
 """
-import os
-
-from dotenv import load_dotenv
-
 from app.agents.tools import (
     get_accepted_requests,
     get_rejected_requests,
     calculate_capacity_utilization,
     explain_request_decision,
 )
-
-load_dotenv()
+from app.config import settings
 
 SYSTEM_INSTRUCTION = (
     "Sen bir havayolu kargo operasyonu karar destek asistanısın. "
@@ -41,7 +36,7 @@ TOOLS = [
 
 
 def ask_agent(question: str) -> str:
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = settings.gemini_api_key
     if not api_key:
         return (
             "GEMINI_API_KEY tanımlı değil, bu yüzden gerçek bir dil modeli çalışamıyor. "

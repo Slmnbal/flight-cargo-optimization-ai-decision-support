@@ -11,10 +11,7 @@ yansıtıyor. Rota ağı IST hub-and-spoke yapısını taklit ediyor.
 import random
 from datetime import datetime, timedelta
 
-from app.database.connection import Base, engine, SessionLocal
-# app.models paketinden import ediyoruz (tek tek dosyalardan değil) ki
-# __init__.py üzerinden tüm modeller (optimization_result dahil) Base.metadata'ya
-# kaydolsun ve create_all() hiçbir tabloyu atlamasın.
+from app.database.connection import SessionLocal
 from app.models import Airport, AircraftType, Route, Flight, CargoRequest
 
 random.seed(42)
@@ -28,7 +25,10 @@ def seed(db=None):
     """
     owns_session = db is None
     if owns_session:
-        Base.metadata.create_all(bind=engine)
+        # Şema artık Alembic tarafından yönetiliyor -- burada tablo oluşturmuyoruz.
+        # `alembic upgrade head` çalıştırılmadan seed() çağrılırsa, tablo yok hatası
+        # alınır; bu kasıtlı, kurulum sırasının (migration önce, seed sonra) açıkça
+        # görünmesini sağlıyor.
         db = SessionLocal()
 
     for model in [CargoRequest, Flight, Route, AircraftType, Airport]:

@@ -12,7 +12,7 @@ Bir havayolunun kargo operasyonunda, her uçuşun sınırlı bir ağırlık ve h
 İstek (Streamlit UI)
         │
         ▼
-   FastAPI Backend  ──────►  SQLite Veritabanı
+   FastAPI Backend  ──────►  SQLite / PostgreSQL
         │                    (routes, flights,
         ├──► Optimizasyon     cargo_requests, ...)
         │    Motoru (PuLP)
@@ -24,15 +24,27 @@ Bir havayolunun kargo operasyonunda, her uçuşun sınırlı bir ağırlık ve h
              (Gemini + tool calling)
 ```
 
-Katmanlar birbirinden bağımsız: veritabanı SQLAlchemy ORM ile soyutlanmış (PostgreSQL'e geçiş tek satır), optimizasyon motoru saf Python/PuLP (herhangi bir framework'e bağımlı değil), API bu ikisini dışarıya REST olarak açıyor, arayüz sadece API'yi tüketiyor.
+Katmanlar birbirinden bağımsız: veritabanı SQLAlchemy ORM ile soyutlanmış (SQLite ve PostgreSQL ikisi de destekleniyor, tek env değişkeniyle seçiliyor), optimizasyon motoru saf Python/PuLP (herhangi bir framework'e bağımlı değil), API bu ikisini dışarıya REST olarak açıyor, arayüz sadece API'yi tüketiyor.
 
 ## Veritabanı Şeması
 
-5 çekirdek tablo: `airports`, `aircraft_types` (referans tabloları), `routes`, `flights`, `cargo_requests`. Optimizasyon sonuçları `optimization_results` tablosuna yazılır. Detaylı şema için bkz. proje kökündeki `docs/database_schema.md`.
+6 çekirdek tablo: `airports`, `aircraft_types` (referans tabloları), `routes`, `flights`, `cargo_requests`, `optimization_results`. Detaylı şema için bkz. proje kökündeki `docs/database_schema.md`. Şema, Alembic ile yönetiliyor (bkz. `app/backend/alembic/`) — `Base.metadata.create_all()` artık kullanılmıyor.
+
+## Veritabanı: SQLite (varsayılan) veya PostgreSQL
+
+`DATABASE_URL` ortam değişkeni tanımlı değilse `sqlite:///./cargo.db` kullanılır (kurulum gerektirmez). PostgreSQL'e geçmek için `.env`'e `DATABASE_URL=postgresql://user:pass@host:5432/dbname` eklemek yeterli — kod saf SQLAlchemy ORM kullanıyor, dialect'e özel hiçbir şey yok.
+
+Şema değişikliklerini Alembic uyguluyor:
+```bash
+cd app/backend
+alembic upgrade head       # şemayı güncel migration seviyesine getirir
+alembic revision --autogenerate -m "..."   # bir model değişikliğinden sonra yeni migration üretir
+```
+Docker Compose ile çalıştırıldığında (`docker compose up`), backend konteyneri her başladığında `alembic upgrade head`'i otomatik çalıştırır (bkz. `app/backend/Dockerfile`), ve Postgres servisi (`db`) sağlıklı hale gelene kadar bekler.
 
 ## Optimizasyon Modeli
 
-Karar değişkeni: `x_i ∈ {0,1}` (talep i kabul/red). Amaç fonksiyonu: `maximize Σ revenue_i * x_i`. Kısıtlar: her uçuş için kabul edilen taleplerin toplam ağırlığı ve hacmi, o uçağın kapasitesini aşamaz. CBC solver (açık kaynak) ile çözülüyor.
+Karar değişkeni: `x_i ∈ {0,1}` (talep i kabul/red). Amaç fonksiyonu: `maximize Σ revenue_i * x_i`. Kısıtlar: her uçuş için ağırlık/hacim kapasitesi, soğuk zincir kapasitesi, embargo (rota+kargo-tipine-özel), tehlikeli madde taşıma izni, ve priority-class (contract kargo için ayrılmış/korumalı kapasite). CBC solver (açık kaynak) ile çözülüyor. Tasarım kararları için bkz. `docs/adr/0001-cargo-optimization-constraints.md`.
 
 ## API Endpointleri
 
@@ -59,6 +71,7 @@ cd app/backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+alembic upgrade head    # şemayı oluşturur (varsayılan: sqlite:///./cargo.db)
 python -m app.seed_data
 uvicorn app.main:app --reload
 ```
