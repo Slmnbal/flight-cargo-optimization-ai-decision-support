@@ -10,6 +10,8 @@ Docstring'ler ve type hint'ler burada süs değil: Gemini SDK, bir fonksiyonu
 "tool" olarak kullanabilmek için onun ne işe yaradığını (docstring) ve hangi
 parametreleri beklediğini (type hint) otomatik olarak buradan çıkarıyor.
 """
+from sqlalchemy.orm import Session
+
 from app.database.connection import SessionLocal
 from app.models import CargoRequest, OptimizationResult, Flight, AircraftType
 from app.rag.knowledge_base import search_knowledge_base as _search_knowledge_base
@@ -51,6 +53,37 @@ def get_rejected_requests(scenario_name: str) -> list[dict]:
         db.close()
 
 
+def _capacity_utilization(db: Session, flight_id: int) -> dict:
+    """
+    calculate_capacity_utilization'ın gerçek mantığı -- hem Gemini tool'u hem
+    de GET /flights/{flight_id}/capacity-utilization endpoint'i bu private
+    fonksiyonu paylaşır. Ayrı tutulmasının nedeni: Gemini SDK, tool olarak
+    kullanılan fonksiyonun imzasını (type hint'ler dahil) otomatik olarak LLM
+    tool şemasına çeviriyor -- bir `db: Session` parametresi eklemek bu şemayı
+    kirletirdi. Bu yüzden LLM'e görünen `calculate_capacity_utilization(flight_id)`
+    imzası değişmeden kalıyor, REST endpoint'i ise kendi DI session'ını buraya verir.
+    """
+    flight = db.query(Flight).filter(Flight.flight_id == flight_id).first()
+    if flight is None:
+        return {"error": f"flight_id {flight_id} bulunamadı"}
+
+    aircraft = db.query(AircraftType).filter(AircraftType.aircraft_type == flight.aircraft_type).first()
+    accepted = (
+        db.query(CargoRequest)
+        .filter(CargoRequest.flight_id == flight_id, CargoRequest.status == "accepted")
+        .all()
+    )
+    used_weight = sum(r.weight_kg for r in accepted)
+    used_volume = sum(r.volume_m3 for r in accepted)
+
+    return {
+        "flight_id": flight_id,
+        "flight_number": flight.flight_number,
+        "weight_utilization_pct": round(100 * used_weight / aircraft.max_cargo_weight_kg, 1),
+        "volume_utilization_pct": round(100 * used_volume / aircraft.max_cargo_volume_m3, 1),
+    }
+
+
 def calculate_capacity_utilization(flight_id: int) -> dict:
     """Bir uçuşun ağırlık ve hacim kapasitesinin yüzde kaçının kullanıldığını hesaplar.
 
@@ -59,25 +92,7 @@ def calculate_capacity_utilization(flight_id: int) -> dict:
     """
     db = SessionLocal()
     try:
-        flight = db.query(Flight).filter(Flight.flight_id == flight_id).first()
-        if flight is None:
-            return {"error": f"flight_id {flight_id} bulunamadı"}
-
-        aircraft = db.query(AircraftType).filter(AircraftType.aircraft_type == flight.aircraft_type).first()
-        accepted = (
-            db.query(CargoRequest)
-            .filter(CargoRequest.flight_id == flight_id, CargoRequest.status == "accepted")
-            .all()
-        )
-        used_weight = sum(r.weight_kg for r in accepted)
-        used_volume = sum(r.volume_m3 for r in accepted)
-
-        return {
-            "flight_id": flight_id,
-            "flight_number": flight.flight_number,
-            "weight_utilization_pct": round(100 * used_weight / aircraft.max_cargo_weight_kg, 1),
-            "volume_utilization_pct": round(100 * used_volume / aircraft.max_cargo_volume_m3, 1),
-        }
+        return _capacity_utilization(db, flight_id)
     finally:
         db.close()
 

@@ -72,6 +72,18 @@ Bu doküman, Data Layer için üzerinde anlaştığımız tabloları tanımlar. 
 
 `airports` ← `routes` (origin/destination) ← `flights` (route_id) ← `cargo_requests` (flight_id). `aircraft_types` ← `flights` (aircraft_type).
 
+## Performans index'leri (Faz 4 dashboard genişletmesi)
+
+12 aylık zaman serisi verisiyle (~7-8k `flights`, ~100-150k `cargo_requests`) filtresiz tam tablo taraması sürdürülemez hale geldiği için şu kolonlara index eklendi (bkz. `alembic/versions/3a1c9f2e8b4d_add_performance_indexes.py`):
+
+- `flights.flight_number`, `flights.departure_scheduled`
+- `cargo_requests.flight_id`, `cargo_requests.status`
+- `optimization_results.request_id`, `optimization_results.scenario_name`
+
+## Senaryo adı (`scenario_name`) kuralı
+
+`optimization_results.scenario_name`, geçmişe dönük backfill'de (`python -m app.backfill_history`) `daily-YYYY-MM-DD` formatında üretilir — her takvim günü ayrı bir senaryo. Canlı (`POST /optimize`) çağrılar varsayılan olarak `"default"` ya da çağıranın verdiği herhangi bir isimle çalışır; `daily-` öneki sadece backfill'e ait bir kural, kodda zorunlu kılınmıyor.
+
 ## Sıradaki Adım
 
 Bu şemayı SQLAlchemy modellerine dönüştürüyoruz: `backend/app/models/` altında her tablo için bir Python dosyası.

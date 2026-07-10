@@ -7,8 +7,8 @@ class OptimizationResult(Base):
     __tablename__ = "optimization_results"
 
     result_id = Column(Integer, primary_key=True, autoincrement=True)
-    scenario_name = Column(String, nullable=False)
-    request_id = Column(Integer, ForeignKey("cargo_requests.request_id"), nullable=False)
+    scenario_name = Column(String, nullable=False, index=True)
+    request_id = Column(Integer, ForeignKey("cargo_requests.request_id"), nullable=False, index=True)
     decision = Column(String, nullable=False)  # accepted / rejected
     revenue = Column(Float, nullable=False)
     # decision="rejected" olduğunda neden reddedildiğini açıklar, örn.:

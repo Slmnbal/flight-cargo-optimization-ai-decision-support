@@ -9,7 +9,7 @@ Bir havayolunun kargo operasyonunda, her uçuşun sınırlı bir ağırlık ve h
 ## Mimari
 
 ```
-İstek (Streamlit UI)
+İstek (React + Vite Dashboard)
         │
         ▼
    FastAPI Backend  ──────►  SQLite / PostgreSQL
@@ -29,6 +29,8 @@ Katmanlar birbirinden bağımsız: veritabanı SQLAlchemy ORM ile soyutlanmış 
 ## Veritabanı Şeması
 
 6 çekirdek tablo: `airports`, `aircraft_types` (referans tabloları), `routes`, `flights`, `cargo_requests`, `optimization_results`. Detaylı şema için bkz. proje kökündeki `docs/database_schema.md`. Şema, Alembic ile yönetiliyor (bkz. `app/backend/alembic/`) — `Base.metadata.create_all()` artık kullanılmıyor.
+
+`flights`/`cargo_requests`, tek bir güne değil **12 aylık, günlük tekrarlayan bir uçuş takvimine** yayılıyor (bkz. `app/backend/app/seed_data.py`) — aynı `flight_number`, pencere boyunca haftanın belirli günlerinde (`weekdays` pattern'i) birden fazla tarihli `Flight` satırında tekrar kullanılıyor. Pencerenin son günü (bugün) kasıtlı olarak `pending`/`scheduled` bırakılıyor; önceki günler `python -m app.backfill_history` ile `daily-YYYY-MM-DD` adlı ayrı senaryolara optimize ediliyor (bkz. aşağıdaki "Nasıl Çalıştırılır").
 
 ## Veritabanı: SQLite (varsayılan) veya PostgreSQL
 
@@ -50,7 +52,12 @@ Karar değişkeni: `x_i ∈ {0,1}` (talep i kabul/red). Amaç fonksiyonu: `maxim
 
 | Endpoint | Açıklama |
 |---|---|
-| `GET /routes`, `/flights`, `/cargo-requests` | Veriyi listeler |
+| `GET /routes`, `/aircraft-types` | Referans verisini listeler |
+| `GET /flights`, `/cargo-requests` | Sayfalanmış + filtrelenebilir liste (`date_from`, `date_to`, `route_id`/`flight_id`, `status`, `cargo_type`, `priority_class`, `limit`, `offset`) — `{items, total}` şeklinde döner |
+| `GET /flights/{flight_id}/capacity-utilization` | Bir uçuşun ağırlık/hacim kapasite kullanım yüzdesi |
+| `GET /results/{scenario_name}` | Bir senaryonun kabul/red satırları |
+| `GET /kpis/{scenario_name}` | Bir senaryonun toplu KPI özeti |
+| `GET /kpis/trend?group_by=day\|week\|month` | Dönem bazlı gelir/kabul-red/kapasite trend serisi (dashboard grafiği için) |
 | `POST /optimize?scenario_name=...` | Optimizasyonu çalıştırır, kabul/red kararlarını döndürür ve kaydeder |
 | `POST /ml/train` | Geçmiş sonuçlardan kabul olasılığı modeli eğitir |
 | `GET /ml/predict/{request_id}` | Bir talebin kabul olasılığını tahmin eder |
@@ -79,15 +86,17 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 alembic upgrade head    # şemayı oluşturur (varsayılan: sqlite:///./cargo.db)
-python -m app.seed_data
+python -m app.seed_data          # 12 aylık uçuş+kargo talebi verisi üretir
+python -m app.backfill_history   # geçmiş her günü optimize eder (bugün hariç, "pending" kalır)
 uvicorn app.main:app --reload
 ```
 
-Ayrı bir terminalde:
+Ayrı bir terminalde (React + Vite dashboard):
 ```bash
 cd app/frontend
-pip install -r requirements.txt
-streamlit run streamlit_app.py
+npm install
+cp .env.example .env   # VITE_API_BASE_URL=http://localhost:8000
+npm run dev
 ```
 
 ### Docker ile
@@ -97,7 +106,9 @@ cd app
 docker compose up --build
 ```
 
-Backend: `http://localhost:8000/docs` — Frontend: `http://localhost:8501`
+Backend: `http://localhost:8000/docs` — Frontend: `http://localhost:8080`
+
+Not: Docker Compose ile çalıştırıldığında `seed_data`/`backfill_history` otomatik çalışmıyor — ilk kurulumda backend konteynerine girip (`docker compose exec backend sh`) elle çalıştırman gerekir.
 
 ### Gemini API Key (opsiyonel, AI Agent için)
 

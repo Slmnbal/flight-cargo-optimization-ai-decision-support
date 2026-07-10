@@ -129,3 +129,83 @@ def test_get_kpis_returns_aggregated_summary(client, db_session):
 def test_get_kpis_404_for_unknown_scenario(client):
     response = client.get("/kpis/does-not-exist")
     assert response.status_code == 404
+
+
+def test_get_flights_returns_paginated_shape_and_respects_filters(client, db_session):
+    _seed_flight_with_requests(db_session)
+
+    response = client.get("/flights?limit=1")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body.keys()) == {"items", "total"}
+    assert body["total"] == 1
+    assert len(body["items"]) == 1
+    assert body["items"][0]["flight_number"] == "TT001"
+
+    # date_from/date_to filtresi: seed edilen uçuş 2026-01-01'de -- pencere
+    # dışına düşen bir aralık boş sonuç döndürmeli.
+    response = client.get("/flights?date_from=2027-01-01")
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+
+
+def test_get_cargo_requests_returns_paginated_shape_and_respects_status_filter(client, db_session):
+    _seed_flight_with_requests(db_session)
+
+    response = client.get("/cargo-requests?status=accepted")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body.keys()) == {"items", "total"}
+    assert body["total"] == 1
+    assert body["items"][0]["status"] == "accepted"
+
+
+def test_get_flight_capacity_utilization_returns_computed_percentages(client, db_session):
+    requests = _seed_flight_with_requests(db_session)
+    flight_id = requests[0].flight_id
+
+    response = client.get(f"/flights/{flight_id}/capacity-utilization")
+
+    assert response.status_code == 200
+    body = response.json()
+    # aircraft max_cargo_weight_kg=1000, tek accepted talep weight_kg=100 -> %10
+    assert body["weight_utilization_pct"] == 10.0
+    assert body["volume_utilization_pct"] == 10.0
+
+
+def test_get_flight_capacity_utilization_404_for_unknown_flight(client):
+    response = client.get("/flights/999999/capacity-utilization")
+    assert response.status_code == 404
+
+
+def test_get_kpi_trend_groups_by_day_and_computes_aggregates(client, db_session):
+    requests = _seed_flight_with_requests(db_session)
+    db_session.add_all([
+        OptimizationResult(scenario_name="daily-2026-01-01", request_id=requests[0].request_id, decision="accepted", revenue=500, reason=None),
+        OptimizationResult(scenario_name="daily-2026-01-01", request_id=requests[1].request_id, decision="rejected", revenue=0, reason="dangerous_goods_restricted"),
+    ])
+    db_session.commit()
+
+    response = client.get("/kpis/trend?group_by=day")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["group_by"] == "day"
+    assert len(body["points"]) == 1
+    point = body["points"][0]
+    assert point["period"] == "2026-01-01"
+    assert point["total_requests"] == 2
+    assert point["accepted_count"] == 1
+    assert point["rejected_count"] == 1
+    assert point["total_revenue"] == 500
+    assert point["acceptance_rate"] == 0.5
+
+
+def test_get_kpi_trend_route_not_shadowed_by_scenario_name_path(client):
+    # /kpis/trend, /kpis/{scenario_name}'den ÖNCE eşleşmeli -- aksi halde
+    # "trend" bir scenario_name olarak yorumlanır ve 404 döner.
+    response = client.get("/kpis/trend")
+    assert response.status_code == 200
+    assert response.json() == {"group_by": "day", "points": []}

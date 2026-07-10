@@ -22,6 +22,7 @@ alternatifi ne olurdu: docs/adr/0001-cargo-optimization-constraints.md.
 """
 import shutil
 from collections import defaultdict
+from datetime import date, datetime, time, timedelta
 
 import pulp
 from sqlalchemy.orm import Session
@@ -59,8 +60,40 @@ def _is_embargoed(req: CargoRequest, route: Route) -> bool:
     return req.cargo_type in embargoed_types
 
 
-def run_optimization(db: Session, scenario_name: str = "default") -> dict:
-    requests = db.query(CargoRequest).filter(CargoRequest.status == "pending").all()
+def run_optimization(
+    db: Session,
+    scenario_name: str = "default",
+    flight_date: date = None,
+    run_at: datetime = None,
+) -> dict:
+    """
+    flight_date verilirse, sadece o güne ait uçuşlara ait bekleyen talepler
+    işlenir (Flight.departure_scheduled üzerinden join) -- geçmişe dönük
+    günlük backfill (bkz. backfill_history.py) için kullanılır.
+
+    "O gün" takvim gecesi yarısı (00:00-00:00) değil, seed_data.py'deki
+    generate_flight_instances ile birebir eşleşen 06:00-06:00 operasyonel gün
+    penceresidir: her uçuş, o günün 06:00 çapasına (anchor) göre üretiliyor ve
+    bazı geç saatli freighter dönüş uçuşları (offset 18-23 saat) gece yarısını
+    geçip takvim olarak ertesi güne düşebiliyor -- 00:00 sınırı kullanılsaydı
+    bu uçuşlar hiçbir backfill gününde yakalanmaz, talepleri kalıcı olarak
+    "pending" kalırdı.
+
+    run_at verilirse, üretilen OptimizationResult satırlarının run_at zaman
+    damgası bununla yazılır (backfill'in tarihsel doğru zaman damgası
+    üretebilmesi için); verilmezse mevcut davranış korunur (model default'u
+    devreye girer). Her iki parametre de opsiyonel/geriye-uyumlu -- flight_date
+    ve run_at verilmeden çağrılan mevcut kullanım (canlı /optimize endpoint'i,
+    mevcut testler) davranışı hiç değişmez.
+    """
+    query = db.query(CargoRequest).filter(CargoRequest.status == "pending")
+    if flight_date is not None:
+        day_start = datetime.combine(flight_date, time(6, 0))
+        query = query.join(Flight, Flight.flight_id == CargoRequest.flight_id).filter(
+            Flight.departure_scheduled >= day_start,
+            Flight.departure_scheduled < day_start + timedelta(days=1),
+        )
+    requests = query.all()
 
     if not requests:
         return {"status": "no_pending_requests", "accepted": [], "rejected": [], "total_revenue": 0.0}
@@ -140,32 +173,34 @@ def run_optimization(db: Session, scenario_name: str = "default") -> dict:
         req.status = decision
         (accepted if decision == "accepted" else rejected).append(req.request_id)
 
-        db.add(
-            OptimizationResult(
-                scenario_name=scenario_name,
-                request_id=req.request_id,
-                decision=decision,
-                revenue=req.revenue if decision == "accepted" else 0.0,
-                # Not: LP içinde hangi spesifik kısıtın (ağırlık/hacim/soğuk-zincir/
-                # priority-reservation) bağlayıcı olduğunu dual value/slack incelemeden
-                # ayırt edemiyoruz -- bu yüzden LP'nin reddettiği her talep için tek,
-                # genel bir sebep kullanıyoruz. Bilinçli bir basitleştirme.
-                reason=None if decision == "accepted" else "capacity_exceeded",
-            )
+        result_kwargs = dict(
+            scenario_name=scenario_name,
+            request_id=req.request_id,
+            decision=decision,
+            revenue=req.revenue if decision == "accepted" else 0.0,
+            # Not: LP içinde hangi spesifik kısıtın (ağırlık/hacim/soğuk-zincir/
+            # priority-reservation) bağlayıcı olduğunu dual value/slack incelemeden
+            # ayırt edemiyoruz -- bu yüzden LP'nin reddettiği her talep için tek,
+            # genel bir sebep kullanıyoruz. Bilinçli bir basitleştirme.
+            reason=None if decision == "accepted" else "capacity_exceeded",
         )
+        if run_at is not None:
+            result_kwargs["run_at"] = run_at
+        db.add(OptimizationResult(**result_kwargs))
 
     for req, reason in pre_rejected:
         req.status = "rejected"
         rejected.append(req.request_id)
-        db.add(
-            OptimizationResult(
-                scenario_name=scenario_name,
-                request_id=req.request_id,
-                decision="rejected",
-                revenue=0.0,
-                reason=reason,
-            )
+        result_kwargs = dict(
+            scenario_name=scenario_name,
+            request_id=req.request_id,
+            decision="rejected",
+            revenue=0.0,
+            reason=reason,
         )
+        if run_at is not None:
+            result_kwargs["run_at"] = run_at
+        db.add(OptimizationResult(**result_kwargs))
 
     db.commit()
 

@@ -114,3 +114,36 @@ class AgentAskRequest(BaseModel):
 class AgentAskResponse(BaseModel):
     answer: str
     session_id: str
+
+
+class PaginatedFlightsOut(BaseModel):
+    items: list[FlightOut]
+    total: int
+
+
+class PaginatedCargoRequestsOut(BaseModel):
+    items: list[CargoRequestOut]
+    total: int
+
+
+class CapacityUtilizationOut(BaseModel):
+    flight_id: int
+    flight_number: str
+    weight_utilization_pct: float
+    volume_utilization_pct: float
+
+
+class KpiTrendPointOut(BaseModel):
+    period: str
+    total_requests: int
+    accepted_count: int
+    rejected_count: int
+    total_revenue: float
+    acceptance_rate: float
+    avg_weight_utilization_pct: float
+    avg_volume_utilization_pct: float
+
+
+class KpiTrendResponse(BaseModel):
+    group_by: str
+    points: list[KpiTrendPointOut]
