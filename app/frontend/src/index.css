@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/*
+ * Renk token'ları: dataviz skill'inin referans paletinden (validated default)
+ * türetilmiştir -- kategorik/sequential/status renkler birebir o palet, sadece
+ * marka (brand) rengi THY-esinli koyu kırmızı ile değiştirildi (chrome/logo/
+ * aktif-durum vurguları için, GRAFİK renkleri için DEĞİL -- kategorik renkler
+ * CVD/kontrast doğrulamasından geçmiş referans setinde kalıyor).
+ * Kontrastlar node scripts/validate_palette.js ile doğrulandı:
+ *   brand (light) #a01326 vs beyaz metin  -> 8.0:1
+ *   brand (dark)  #e2374f vs koyu yüzey   -> 4.1:1, beyaz metin -> 4.3:1
+ */
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Marka (THY-esinli kurumsal kırmızı) -- sadece chrome/vurgu, grafik değil */
+  --color-brand: #a01326;
+  --color-brand-hover: #7d0f1e;
+  --color-brand-soft: #fbe7ea;
+
+  /* Yüzeyler ve metin */
+  --color-surface: #fcfcfb;
+  --color-surface-alt: #f9f9f7;
+  --color-ink: #0b0b0b;
+  --color-ink-secondary: #52514e;
+  --color-ink-muted: #898781;
+  --color-grid: #e1e0d9;
+  --color-border: #e1e0d9;
+
+  /* Durum (status) -- accepted/pending/rejected için sabit, tema değişmez */
+  --color-good: #0ca30c;
+  --color-warning: #fab219;
+  --color-serious: #ec835a;
+  --color-critical: #d03b3b;
+
+  /* Kategorik grafik paleti (8 slot, sabit sıra -- CVD-güvenli) */
+  --color-cat-1: #2a78d6;
+  --color-cat-2: #1baf7a;
+  --color-cat-3: #eda100;
+  --color-cat-4: #008300;
+  --color-cat-5: #4a3aa7;
+  --color-cat-6: #e34948;
+  --color-cat-7: #e87ba4;
+  --color-cat-8: #eb6834;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-brand: #e2374f;
+    --color-brand-hover: #f0546c;
+    --color-brand-soft: #3a1418;
+
+    --color-surface: #1a1a19;
+    --color-surface-alt: #0d0d0d;
+    --color-ink: #ffffff;
+    --color-ink-secondary: #c3c2b7;
+    --color-ink-muted: #898781;
+    --color-grid: #2c2c2a;
+    --color-border: #2c2c2a;
+
+    --color-good: #0ca30c;
+    --color-warning: #fab219;
+    --color-serious: #ec835a;
+    --color-critical: #d03b3b;
+
+    --color-cat-1: #3987e5;
+    --color-cat-2: #199e70;
+    --color-cat-3: #c98500;
+    --color-cat-4: #008300;
+    --color-cat-5: #9085e9;
+    --color-cat-6: #e66767;
+    --color-cat-7: #d55181;
+    --color-cat-8: #d95926;
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-surface-alt);
+  color: var(--color-ink);
+}
+
+#root {
+  min-height: 100vh;
+}
