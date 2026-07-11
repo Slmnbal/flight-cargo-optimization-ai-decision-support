@@ -1,13 +1,14 @@
 import logging
-from collections import Counter
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
-from app.models import Route, Flight, CargoRequest, AircraftType, OptimizationResult
+from app.models import Route, Flight, CargoRequest, AircraftType, OptimizationResult, Airport
 from app.schemas.schemas import (
+    AirportOut,
     RouteOut,
     FlightOut,
     CargoRequestOut,
@@ -23,14 +24,24 @@ from app.schemas.schemas import (
     PaginatedCargoRequestsOut,
     CapacityUtilizationOut,
     KpiTrendResponse,
+    PaginatedScenariosOut,
+    DatasetSummaryOut,
+    GenerateDemandResponse,
 )
 from app.optimization.optimizer import run_optimization
 from app.ml.demand_forecast import train_acceptance_model, load_model, predict_acceptance_probability
 from app.agents.explainer import ask_agent
 from app.agents.tools import _capacity_utilization
+from app.services import analytics_service
+from app.seed_data import generate_requests_for_flight_instance, seasonality_multiplier, WINDOW_END
 
 logger = logging.getLogger("cargo_api")
 router = APIRouter()
+
+
+@router.get("/airports", response_model=list[AirportOut])
+def get_airports(db: Session = Depends(get_db)):
+    return db.query(Airport).all()
 
 
 @router.get("/routes", response_model=list[RouteOut])
@@ -191,25 +202,30 @@ def get_kpi_trend(
     return {"group_by": group_by, "points": points}
 
 
+@router.get("/scenarios", response_model=PaginatedScenariosOut)
+def get_scenarios(
+    limit: int = Query(50, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """
+    Şimdiye kadar çalıştırılmış tüm optimizasyon senaryolarını (canlı
+    /optimize çağrıları + backfill_history.py'nin ürettiği daily-YYYY-MM-DD
+    senaryoları) özet halinde listeler -- dashboard'un Optimizasyon
+    sayfasındaki senaryo geçmişi tablosu için. Aggregation mantığı
+    services/analytics_service.py'de -- AI Agent tool'ları da aynı
+    fonksiyonu kullanıyor.
+    """
+    items, total = analytics_service.list_scenario_summaries(db, limit, offset)
+    return {"items": items, "total": total}
+
+
 @router.get("/kpis/{scenario_name}", response_model=KpiSummaryOut)
 def get_kpis(scenario_name: str, db: Session = Depends(get_db)):
-    rows = db.query(OptimizationResult).filter(OptimizationResult.scenario_name == scenario_name).all()
-    if not rows:
+    summary = analytics_service.get_scenario_kpi_summary(db, scenario_name)
+    if summary is None:
         raise HTTPException(status_code=404, detail="Bu senaryo için sonuç bulunamadı.")
-
-    accepted = [r for r in rows if r.decision == "accepted"]
-    rejected = [r for r in rows if r.decision == "rejected"]
-    reason_breakdown = Counter(r.reason for r in rejected if r.reason)
-
-    return {
-        "scenario_name": scenario_name,
-        "total_requests": len(rows),
-        "accepted_count": len(accepted),
-        "rejected_count": len(rejected),
-        "total_revenue": sum(r.revenue for r in accepted),
-        "rejection_reason_breakdown": dict(reason_breakdown),
-        "last_run_at": max(r.run_at for r in rows),
-    }
+    return summary
 
 
 @router.post("/optimize", response_model=OptimizeResponse)
@@ -256,3 +272,57 @@ def agent_ask(payload: AgentAskRequest, db: Session = Depends(get_db)):
     except Exception as exc:
         logger.exception("Agent failed")
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/dataset/summary", response_model=DatasetSummaryOut)
+def get_dataset_summary(db: Session = Depends(get_db)):
+    """Dashboard'un Veri Seti sayfası için: her tablonun satır sayısı ve
+    uçuş verisinin kapsadığı tarih aralığı (backfill'in ürettiği 12 aylık
+    pencere)."""
+    date_range = db.query(func.min(Flight.departure_scheduled), func.max(Flight.departure_scheduled)).first()
+    data_start, data_end = date_range if date_range else (None, None)
+
+    return {
+        "airports_count": db.query(Airport).count(),
+        "aircraft_types_count": db.query(AircraftType).count(),
+        "routes_count": db.query(Route).count(),
+        "flights_count": db.query(Flight).count(),
+        "cargo_requests_count": db.query(CargoRequest).count(),
+        "optimization_results_count": db.query(OptimizationResult).count(),
+        "data_start": data_start.date() if data_start else None,
+        "data_end": data_end.date() if data_end else None,
+    }
+
+
+@router.post("/dataset/generate-demand", response_model=GenerateDemandResponse)
+def generate_demand(db: Session = Depends(get_db)):
+    """
+    Pencerenin son gününe (bugün, backfill'in kasıtlı olarak dokunmadığı
+    "canlı" gün) ait uçuşlara yeni bekleyen kargo talepleri ekler --
+    seed_data.py'deki aynı üretim mantığını (generate_requests_for_flight_instance)
+    kullanır, ama tam bir reseed gibi mevcut veriyi SİLMEZ, sadece üstüne ekler.
+    Dashboard'daki "Optimizasyonu Çalıştır" aksiyonunu, terminal komutuna
+    dönmeden tekrar tekrar test edilebilir kılmak için.
+    """
+    today_flights = db.query(Flight).filter(Flight.departure_scheduled >= WINDOW_END).all()
+    if not today_flights:
+        raise HTTPException(status_code=404, detail="Pencerenin son gününe ait uçuş bulunamadı.")
+
+    route_by_id = {r.route_id: r for r in db.query(Route).all()}
+    multiplier = seasonality_multiplier(WINDOW_END.date())
+
+    new_requests = []
+    for flight in today_flights:
+        route = route_by_id[flight.route_id]
+        new_requests.extend(generate_requests_for_flight_instance(flight, route, multiplier))
+
+    db.add_all(new_requests)
+    db.commit()
+
+    pending_count = db.query(CargoRequest).filter(CargoRequest.status == "pending").count()
+
+    return {
+        "generated_count": len(new_requests),
+        "flights_count": len(today_flights),
+        "pending_count": pending_count,
+    }

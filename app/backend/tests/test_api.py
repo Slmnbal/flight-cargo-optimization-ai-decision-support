@@ -12,7 +12,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.database.connection import get_db
-from app.models import AircraftType, Route, Flight, CargoRequest, OptimizationResult
+from app.models import AircraftType, Airport, Route, Flight, CargoRequest, OptimizationResult
+from app.seed_data import WINDOW_END
 
 
 @pytest.fixture()
@@ -53,6 +54,25 @@ def test_get_aircraft_types_returns_seeded_rows(client, db_session):
         "temperature_controlled_capacity_kg": 100.0,
         "is_freighter": False,
         "dangerous_goods_allowed": False,
+    }]
+
+
+def test_get_airports_returns_seeded_rows(client, db_session):
+    db_session.add(Airport(
+        airport_code="TST", airport_name="Test Airport", country="Testland",
+        timezone="UTC", customs_available=True,
+    ))
+    db_session.commit()
+
+    response = client.get("/airports")
+
+    assert response.status_code == 200
+    assert response.json() == [{
+        "airport_code": "TST",
+        "airport_name": "Test Airport",
+        "country": "Testland",
+        "timezone": "UTC",
+        "customs_available": True,
     }]
 
 
@@ -209,3 +229,132 @@ def test_get_kpi_trend_route_not_shadowed_by_scenario_name_path(client):
     response = client.get("/kpis/trend")
     assert response.status_code == 200
     assert response.json() == {"group_by": "day", "points": []}
+
+
+def test_get_scenarios_returns_paginated_summaries_sorted_by_most_recent(client, db_session):
+    requests = _seed_flight_with_requests(db_session)
+    db_session.add_all([
+        OptimizationResult(
+            scenario_name="daily-2026-01-01", request_id=requests[0].request_id, decision="accepted",
+            revenue=500, reason=None, run_at=datetime(2026, 1, 1, 23, 0),
+        ),
+        OptimizationResult(
+            scenario_name="daily-2026-01-01", request_id=requests[1].request_id, decision="rejected",
+            revenue=0, reason="dangerous_goods_restricted", run_at=datetime(2026, 1, 1, 23, 0),
+        ),
+        OptimizationResult(
+            scenario_name="daily-2026-01-02", request_id=requests[0].request_id, decision="accepted",
+            revenue=500, reason=None, run_at=datetime(2026, 1, 2, 23, 0),
+        ),
+    ])
+    db_session.commit()
+
+    response = client.get("/scenarios")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    # en son çalışan senaryo (daily-2026-01-02) ilk sırada olmalı
+    assert [item["scenario_name"] for item in body["items"]] == ["daily-2026-01-02", "daily-2026-01-01"]
+    first = body["items"][0]
+    assert first["total_requests"] == 1
+    assert first["accepted_count"] == 1
+    assert first["total_revenue"] == 500
+
+    second = body["items"][1]
+    assert second["total_requests"] == 2
+    assert second["accepted_count"] == 1
+    assert second["rejected_count"] == 1
+
+
+def test_get_scenarios_respects_limit_and_offset(client, db_session):
+    requests = _seed_flight_with_requests(db_session)
+    db_session.add_all([
+        OptimizationResult(
+            scenario_name=f"daily-2026-01-{day:02d}", request_id=requests[0].request_id, decision="accepted",
+            revenue=100, reason=None, run_at=datetime(2026, 1, day, 23, 0),
+        )
+        for day in range(1, 6)
+    ])
+    db_session.commit()
+
+    response = client.get("/scenarios?limit=2&offset=1")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 5
+    assert len(body["items"]) == 2
+    assert [item["scenario_name"] for item in body["items"]] == ["daily-2026-01-04", "daily-2026-01-03"]
+
+
+def test_get_dataset_summary_returns_counts_and_date_range(client, db_session):
+    _seed_flight_with_requests(db_session)
+
+    response = client.get("/dataset/summary")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["aircraft_types_count"] == 1
+    assert body["routes_count"] == 1
+    assert body["flights_count"] == 1
+    assert body["cargo_requests_count"] == 2
+    assert body["data_start"] == "2026-01-01"
+    assert body["data_end"] == "2026-01-01"
+
+
+def test_get_dataset_summary_handles_empty_database(client):
+    response = client.get("/dataset/summary")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["flights_count"] == 0
+    assert body["data_start"] is None
+    assert body["data_end"] is None
+
+
+def test_generate_demand_adds_pending_requests_for_last_day_flights(client, db_session):
+    aircraft = AircraftType(
+        aircraft_type="TEST1", max_cargo_weight_kg=1000, max_cargo_volume_m3=10,
+        temperature_controlled_capacity_kg=0, is_freighter=False, dangerous_goods_allowed=False,
+    )
+    db_session.add(aircraft)
+    db_session.commit()
+    route = Route(
+        origin_airport="AAA", destination_airport="BBB", distance_km=100,
+        route_type="domestic", region="Turkey", customs_required=False,
+        restricted_cargo_allowed=True, embargo_active=False, is_active=True,
+    )
+    db_session.add(route)
+    db_session.commit()
+    # WINDOW_END'den ÖNCEKİ bir uçuş -- "bugün" sayılmamalı, generate-demand'a dahil edilmemeli.
+    old_flight = Flight(
+        flight_number="OLD1", route_id=route.route_id, aircraft_type="TEST1",
+        departure_scheduled=WINDOW_END.replace(year=WINDOW_END.year - 1),
+        arrival_scheduled=WINDOW_END.replace(year=WINDOW_END.year - 1),
+        status="completed",
+    )
+    # WINDOW_END'e eşit/sonraki bir uçuş -- "bugün" sayılmalı.
+    today_flight = Flight(
+        flight_number="NEW1", route_id=route.route_id, aircraft_type="TEST1",
+        departure_scheduled=WINDOW_END, arrival_scheduled=WINDOW_END,
+        status="scheduled",
+    )
+    db_session.add_all([old_flight, today_flight])
+    db_session.commit()
+
+    response = client.post("/dataset/generate-demand")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["flights_count"] == 1  # sadece today_flight
+    assert body["generated_count"] >= 10  # random_request 10-18 arası üretir
+    assert body["pending_count"] == body["generated_count"]
+
+    generated = db_session.query(CargoRequest).filter(CargoRequest.flight_id == today_flight.flight_id).all()
+    assert len(generated) == body["generated_count"]
+    assert all(r.status == "pending" for r in generated)
+
+
+def test_generate_demand_404_when_no_flights_in_window(client):
+    response = client.post("/dataset/generate-demand")
+    assert response.status_code == 404

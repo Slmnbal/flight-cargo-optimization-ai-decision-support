@@ -1,5 +1,16 @@
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel
+
+
+class AirportOut(BaseModel):
+    airport_code: str
+    airport_name: str
+    country: str
+    timezone: str
+    customs_available: bool
+
+    class Config:
+        from_attributes = True
 
 
 class RouteOut(BaseModel):
@@ -147,3 +158,34 @@ class KpiTrendPointOut(BaseModel):
 class KpiTrendResponse(BaseModel):
     group_by: str
     points: list[KpiTrendPointOut]
+
+
+class ScenarioSummaryOut(BaseModel):
+    scenario_name: str
+    total_requests: int
+    accepted_count: int
+    rejected_count: int
+    total_revenue: float
+    last_run_at: datetime
+
+
+class PaginatedScenariosOut(BaseModel):
+    items: list[ScenarioSummaryOut]
+    total: int
+
+
+class DatasetSummaryOut(BaseModel):
+    airports_count: int
+    aircraft_types_count: int
+    routes_count: int
+    flights_count: int
+    cargo_requests_count: int
+    optimization_results_count: int
+    data_start: date | None
+    data_end: date | None
+
+
+class GenerateDemandResponse(BaseModel):
+    generated_count: int
+    flights_count: int
+    pending_count: int

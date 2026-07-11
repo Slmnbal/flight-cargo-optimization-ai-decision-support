@@ -21,8 +21,15 @@ from sqlalchemy.orm import Session
 from app.agents.tools import (
     get_accepted_requests,
     get_rejected_requests,
+    get_scenario_kpi_summary,
+    list_recent_scenarios,
+    get_route_statistics,
+    get_top_routes_by_revenue,
     calculate_capacity_utilization,
     explain_request_decision,
+    predict_acceptance_probability_for_request,
+    get_aircraft_type_specs,
+    list_restricted_routes,
     search_knowledge_base,
 )
 from app.config import settings
@@ -34,22 +41,31 @@ SYSTEM_INSTRUCTION = (
     "Hiçbir sayı, karar veya gerekçe uydurma. Elindeki tool'lar soruyu cevaplamaya "
     "yetmiyorsa bunu açıkça söyle. Solver'ın verdiği kabul/red kararını asla "
     "değiştirme veya sorgulama, sadece mevcut veriye dayanarak açıkla. "
-    "get_accepted_requests, get_rejected_requests, calculate_capacity_utilization ve "
-    "explain_request_decision tool'ları CANLI veritabanı verisidir (belirli bir talep/"
-    "uçuş/senaryo hakkında somut sayılar). search_knowledge_base tool'u ise projenin "
-    "kendi tasarım dokümantasyonundan (iş kuralları, kısıt gerekçeleri) getirilen genel "
-    "AÇIKLAYICI bilgidir -- 'neden embargo var', 'priority_class nasıl işliyor' gibi "
-    "kavramsal sorularda bunu kullan. Cevap verirken hangi tür bilgiye dayandığını "
-    "(canlı veri mi, dokümantasyon mu) karıştırma; söylediğin şeyin hangi kaynaktan "
-    "geldiğini kullanıcı sorarsa açıkça belirtebilmelisin. "
+    "search_knowledge_base HARİÇ tüm tool'lar CANLI veritabanı/model verisidir (belirli "
+    "bir talep/uçuş/rota/senaryo hakkında somut, güncel sayılar -- ML tahmini dahil, "
+    "o da geçmiş veriden öğrenilmiş gerçek bir model çıktısıdır, uydurma değil). "
+    "search_knowledge_base tool'u ise projenin kendi tasarım dokümantasyonundan (iş "
+    "kuralları, kısıt gerekçeleri) getirilen genel AÇIKLAYICI bilgidir -- 'neden embargo "
+    "var', 'priority_class nasıl işliyor' gibi kavramsal sorularda bunu kullan. Cevap "
+    "verirken hangi tür bilgiye dayandığını (canlı veri/model mi, dokümantasyon mu) "
+    "karıştırma; söylediğin şeyin hangi kaynaktan geldiğini kullanıcı sorarsa açıkça "
+    "belirtebilmelisin. ML tahmini bir olasılıktır, solver'ın kesin kabul/red kararının "
+    "yerini tutmaz -- bunu karıştırma. "
     "Cevaplarını kısa ve net tut, Türkçe cevap ver."
 )
 
 TOOLS = [
     get_accepted_requests,
     get_rejected_requests,
+    get_scenario_kpi_summary,
+    list_recent_scenarios,
+    get_route_statistics,
+    get_top_routes_by_revenue,
     calculate_capacity_utilization,
     explain_request_decision,
+    predict_acceptance_probability_for_request,
+    get_aircraft_type_specs,
+    list_restricted_routes,
     search_knowledge_base,
 ]
 
