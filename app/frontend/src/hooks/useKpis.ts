@@ -3,10 +3,11 @@ import { apiClient, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryKeys'
 import type { KpiSummaryOut } from '@/types/api'
 
-export function useKpis(scenarioName: string) {
+export function useKpis(scenarioName: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.kpis(scenarioName),
-    queryFn: () => apiClient.get<KpiSummaryOut>(`/kpis/${encodeURIComponent(scenarioName)}`),
+    queryKey: queryKeys.kpis(scenarioName ?? ''),
+    queryFn: () => apiClient.get<KpiSummaryOut>(`/kpis/${encodeURIComponent(scenarioName ?? '')}`),
+    enabled: scenarioName !== undefined,
     retry: (failureCount, error) => {
       // 404 = bu senaryo için henüz sonuç yok (örn. hiç optimizasyon çalıştırılmadı) --
       // tekrar denemek anlamsız, sabit bir hata olarak kalacak.

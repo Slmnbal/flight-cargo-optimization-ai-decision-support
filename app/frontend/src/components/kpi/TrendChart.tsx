@@ -19,7 +19,7 @@ export function TrendChart({ title, data, color, valueFormatter = String }: Tren
   const gradientId = `trend-fill-${useId()}`
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <div className="card p-4">
       <p className="text-sm font-medium text-ink">{title}</p>
       <div className="mt-3 h-56">
         <ResponsiveContainer width="100%" height="100%">

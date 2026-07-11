@@ -4,6 +4,7 @@ import { useRoutes } from '@/hooks/useRoutes'
 import { useCapacityUtilization } from '@/hooks/useCapacityUtilization'
 import { DataTable, type DataTableColumn } from '@/components/tables/DataTable'
 import { StatusBadge } from '@/components/common/StatusBadge'
+import { Icon } from '@/components/icons/Icon'
 import type { FlightOut } from '@/types/api'
 
 const PAGE_SIZE = 25
@@ -63,7 +64,7 @@ export function FlightsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="card flex flex-wrap items-end gap-3 p-4">
         <label className="flex flex-col gap-1 text-xs text-ink-secondary">
           Başlangıç
           <input
@@ -124,7 +125,10 @@ export function FlightsPage() {
       </div>
 
       {selectedFlightId && (
-        <div className="rounded-lg border border-border bg-surface p-4 text-sm">
+        <div className="card flex items-center gap-3 p-4 text-sm">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-chrome-soft text-chrome">
+            <Icon name="cargo" size={16} />
+          </span>
           {isCapacityLoading && <p className="text-ink-muted">Yükleniyor...</p>}
           {capacity && (
             <div className="flex flex-wrap gap-6">
@@ -151,7 +155,7 @@ export function FlightsPage() {
             type="button"
             disabled={!hasPrev}
             onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-            className="rounded-md border border-border px-3 py-1 disabled:opacity-40"
+            className="rounded-full border border-border px-3.5 py-1 disabled:opacity-40"
           >
             Önceki
           </button>
@@ -159,7 +163,7 @@ export function FlightsPage() {
             type="button"
             disabled={!hasNext}
             onClick={() => setOffset((o) => o + PAGE_SIZE)}
-            className="rounded-md border border-border px-3 py-1 disabled:opacity-40"
+            className="rounded-full border border-border px-3.5 py-1 disabled:opacity-40"
           >
             Sonraki
           </button>

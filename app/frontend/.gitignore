@@ -17,6 +17,11 @@ dist-ssr
 .env.*
 !.env.example
 
+# THY logosu -- gerçek/lisanslı bir kopyan varsa buraya (public/logo-thy.*)
+# koyabilirsin, Sidebar otomatik yakalar. Marka hakkı riski taşıdığı için
+# bu dosya asla commit edilmemeli, sadece lokalde kalmalı.
+public/logo-thy.*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

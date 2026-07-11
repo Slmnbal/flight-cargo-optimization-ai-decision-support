@@ -2,6 +2,14 @@
 // senkron tutuluyor (bu ölçekte OpenAPI codegen gereksiz) -- schemas.py
 // değiştiğinde burası da güncellenmeli.
 
+export interface AirportOut {
+  airport_code: string
+  airport_name: string
+  country: string
+  timezone: string
+  customs_available: boolean
+}
+
 export interface RouteOut {
   route_id: number
   origin_airport: string
@@ -157,4 +165,40 @@ export interface CargoRequestsQuery {
   date_to?: string
   limit?: number
   offset?: number
+}
+
+export interface ScenarioSummaryOut {
+  scenario_name: string
+  total_requests: number
+  accepted_count: number
+  rejected_count: number
+  total_revenue: number
+  last_run_at: string
+}
+
+export interface PaginatedScenariosOut {
+  items: ScenarioSummaryOut[]
+  total: number
+}
+
+export interface ScenariosQuery {
+  limit?: number
+  offset?: number
+}
+
+export interface DatasetSummaryOut {
+  airports_count: number
+  aircraft_types_count: number
+  routes_count: number
+  flights_count: number
+  cargo_requests_count: number
+  optimization_results_count: number
+  data_start: string | null
+  data_end: string | null
+}
+
+export interface GenerateDemandResponse {
+  generated_count: number
+  flights_count: number
+  pending_count: number
 }

@@ -6,17 +6,32 @@
  * marka (brand) rengi THY-esinli koyu kırmızı ile değiştirildi (chrome/logo/
  * aktif-durum vurguları için, GRAFİK renkleri için DEĞİL -- kategorik renkler
  * CVD/kontrast doğrulamasından geçmiş referans setinde kalıyor).
+ *
+ * Kullanıcının paylaştığı gerçek turkishairlines.com ekran görüntüsüne göre
+ * düzeltildi: kırmızı sitede HAKİM renk değil, sadece aktif/seçili öğe
+ * vurgusu (örn. seçili menü satırı) -- ana chrome (header/sidebar) koyu
+ * lacivert/antrasit. Bu yüzden --color-chrome eklendi (sidebar/header zemini)
+ * ve --color-brand SADECE aktif nav bloğu, birincil butonlar, ince üst şerit
+ * ve grafik aksanları için kullanılıyor -- birebir bir marka varlığının
+ * kopyası değil, gözlemlenen renk DAĞILIMINA (lacivert baskın + kırmızı
+ * nokta vurgu) esinlenen bir palet kararı.
  * Kontrastlar node scripts/validate_palette.js ile doğrulandı:
- *   brand (light) #a01326 vs beyaz metin  -> 8.0:1
- *   brand (dark)  #e2374f vs koyu yüzey   -> 4.1:1, beyaz metin -> 4.3:1
+ *   brand (light) #c8102e vs beyaz metin  -> 5.9:1
+ *   brand (dark)  #e8394f vs koyu yüzey   -> 4.3:1, beyaz metin -> 4.1:1
+ *   chrome #1f2937 vs beyaz metin         -> 14.7:1
  */
 @theme {
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* Marka (THY-esinli kurumsal kırmızı) -- sadece chrome/vurgu, grafik değil */
-  --color-brand: #a01326;
-  --color-brand-hover: #7d0f1e;
+  /* Marka (THY-esinli kurumsal kırmızı) -- SADECE aktif/vurgu, chrome zemini değil */
+  --color-brand: #c8102e;
+  --color-brand-hover: #9e0c24;
   --color-brand-soft: #fbe7ea;
+
+  /* Chrome (sidebar/header zemini) -- THY sitesindeki koyu lacivert/antrasit header'dan esinlenildi */
+  --color-chrome: #1f2937;
+  --color-chrome-alt: #29323f;
+  --color-chrome-soft: #eef0f3;
 
   /* Yüzeyler ve metin */
   --color-surface: #fcfcfb;
@@ -46,8 +61,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-brand: #e2374f;
-    --color-brand-hover: #f0546c;
+    --color-brand: #e8394f;
+    --color-brand-hover: #f2586c;
     --color-brand-soft: #3a1418;
 
     --color-surface: #1a1a19;
@@ -76,6 +91,23 @@
 
 html {
   color-scheme: light dark;
+}
+
+/* Paylaşılan "kart" görünümü -- sayfalar arasında tekrarlanan
+   `border border-border bg-surface` kalıbı yerine; hafif bir gölge ile
+   düz border'a göre bir derinlik adımı ekliyor (dataviz skill'in "asla
+   mark'ın etrafına çizgi çekme" kuralı grafik mark'ları için, UI kartları
+   için değil -- burada geçerli değil). */
+@layer components {
+  .card {
+    @apply rounded-xl border border-border bg-surface shadow-sm;
+  }
+
+  /* Sidebar + hero panel zemini -- koyu lacivert/antrasit chrome (kırmızı
+     burada DEĞİL, sadece aktif nav bloğu/butonlarda kullanılıyor). */
+  .chrome-shell {
+    background: linear-gradient(175deg, var(--color-chrome) 0%, var(--color-chrome-alt) 130%);
+  }
 }
 
 body {

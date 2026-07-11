@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useRoutes } from '@/hooks/useRoutes'
 import { DataTable, type DataTableColumn } from '@/components/tables/DataTable'
+import { KpiCard } from '@/components/kpi/KpiCard'
 import type { RouteOut } from '@/types/api'
 
 const columns: DataTableColumn<RouteOut>[] = [
@@ -39,8 +40,25 @@ export function RoutesPage() {
     )
   }, [data, search])
 
+  const stats = useMemo(() => {
+    const list = data ?? []
+    return {
+      total: list.length,
+      embargoed: list.filter((r) => r.embargo_active).length,
+      restricted: list.filter((r) => !r.restricted_cargo_allowed).length,
+      regions: new Set(list.map((r) => r.region)).size,
+    }
+  }, [data])
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KpiCard label="Toplam Rota" value={isLoading ? '—' : String(stats.total)} icon="route" />
+        <KpiCard label="Bölge Sayısı" value={isLoading ? '—' : String(stats.regions)} icon="overview" />
+        <KpiCard label="Embargolu Rota" value={isLoading ? '—' : String(stats.embargoed)} icon="cargo" />
+        <KpiCard label="Tehlikeli Madde Kısıtlı" value={isLoading ? '—' : String(stats.restricted)} icon="gauge" />
+      </div>
+
       <input
         type="text"
         placeholder="Havalimanı kodu veya bölge ara (örn. IST, Asia)"

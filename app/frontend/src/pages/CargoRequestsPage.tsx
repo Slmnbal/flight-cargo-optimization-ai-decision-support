@@ -41,7 +41,7 @@ export function CargoRequestsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="card flex flex-wrap items-end gap-3 p-4">
         <label className="flex flex-col gap-1 text-xs text-ink-secondary">
           Kargo Tipi
           <select
@@ -102,7 +102,7 @@ export function CargoRequestsPage() {
             type="button"
             disabled={!hasPrev}
             onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-            className="rounded-md border border-border px-3 py-1 disabled:opacity-40"
+            className="rounded-full border border-border px-3.5 py-1 disabled:opacity-40"
           >
             Önceki
           </button>
@@ -110,7 +110,7 @@ export function CargoRequestsPage() {
             type="button"
             disabled={!hasNext}
             onClick={() => setOffset((o) => o + PAGE_SIZE)}
-            className="rounded-md border border-border px-3 py-1 disabled:opacity-40"
+            className="rounded-full border border-border px-3.5 py-1 disabled:opacity-40"
           >
             Sonraki
           </button>

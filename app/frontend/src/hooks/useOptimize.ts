@@ -16,6 +16,7 @@ export function useOptimize() {
       queryClient.invalidateQueries({ queryKey: ['results'] })
       queryClient.invalidateQueries({ queryKey: ['cargo-requests'] })
       queryClient.invalidateQueries({ queryKey: ['flights'] })
+      queryClient.invalidateQueries({ queryKey: ['scenarios'] })
     },
   })
 }

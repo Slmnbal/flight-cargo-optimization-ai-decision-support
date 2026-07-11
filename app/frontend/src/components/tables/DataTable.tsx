@@ -17,7 +17,7 @@ interface DataTableProps<T> {
 
 export function DataTable<T>({ columns, rows, rowKey, isLoading, emptyLabel = 'Kayıt bulunamadı.' }: DataTableProps<T>) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+    <div className="card overflow-x-auto">
       <table className="w-full min-w-max text-left text-sm">
         <thead>
           <tr className="border-b border-border text-xs uppercase tracking-wide text-ink-muted">
